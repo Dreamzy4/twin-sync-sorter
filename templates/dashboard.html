@@ -1,0 +1,1675 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <title>Digital Twin - CV Robot</title>
+  <!-- Chart.js v4.4.3 (MIT) - https://www.chartjs.org/. Vendored to keep the dashboard offline-runnable. -->
+  <script src='/static/chart.umd.min.js'></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+    :root {
+      --bg:        #060610;
+      --bg2:       #0a0a1a;
+      --bg3:       #0e0e20;
+      --border:    #00ff8818;
+      --border2:   #00ff8840;
+      --green:     #00ff88;
+      --blue:      #4488ff;
+      --orange:    #ff6b35;
+      --yellow:    #ffcc00;
+      --red:       #ff3355;
+      --dim:       #334455;
+      --dimmer:    #1a2030;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--green);
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border2);
+      background: var(--bg2);
+      position: sticky; top: 0; z-index: 100;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      letter-spacing: 5px;
+      color: var(--green);
+    }
+    header .sub { color: var(--blue); font-size: 0.7rem; margin-top: 2px; }
+    .hdr-right { text-align: right; }
+    #tick-h { font-size: 1.1rem; }
+    .meta { font-size: 0.68rem; color: var(--dim); margin-top: 3px; }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 8px 20px 0;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 6px 18px;
+      font-size: 0.72rem;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      color: var(--dim);
+      background: transparent;
+      transition: all 0.15s;
+    }
+    .tab:hover { color: var(--green); border-color: var(--border); }
+    .tab.active {
+      color: var(--green);
+      background: var(--bg);
+      border-color: var(--border2);
+    }
+
+    /* ── PANELS ── */
+    .panel { display: none; padding: 14px 20px; }
+    .panel.active { display: block; }
+
+    /* ── GRID ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .card:hover { border-color: var(--border2); }
+    .card h3 {
+      font-size: 0.68rem;
+      letter-spacing: 2px;
+      color: var(--blue);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    /* ── STATUS ── */
+    .status-ok   { color: var(--green); font-size: 2rem; font-weight: bold; }
+    .status-warn { color: var(--red); font-size: 2rem; font-weight: bold;
+                   animation: blink 0.8s infinite; }
+    @keyframes blink { 50% { opacity: 0.3; } }
+    .warn-item { color: #ff6644; font-size: 0.72rem; margin-top: 4px; }
+
+    /* ── JOINTS ── */
+    .joint-row {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .jv {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      text-align: center;
+      padding: 6px 2px;
+      font-size: 0.62rem;
+    }
+    .jv span { display: block; color: var(--dim); font-size: 0.55rem; margin-top: 2px; }
+
+    /* ── CV PANEL ── */
+    .cv-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .cv-feed-wrap {
+      position: relative;
+      background: #000;
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      overflow: hidden;
+      aspect-ratio: 4/3;
+    }
+    .cv-feed-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .cv-feed-label {
+      position: absolute;
+      top: 6px; left: 8px;
+      font-size: 0.62rem;
+      letter-spacing: 2px;
+      color: var(--green);
+      background: #00000099;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .cv-feed-wrap.no-signal::after {
+      content: 'NO SIGNAL';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--dim);
+      font-size: 0.8rem;
+      letter-spacing: 3px;
+    }
+
+    /* ── METRICS GRID ── */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .metric-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 10px;
+    }
+    .metric-label { font-size: 0.60rem; color: var(--dim); letter-spacing: 1px; }
+    .metric-value { font-size: 1.3rem; font-weight: bold; margin-top: 2px; }
+    .mv-green  { color: var(--green); }
+    .mv-blue   { color: var(--blue); }
+    .mv-orange { color: var(--orange); }
+    .mv-yellow { color: var(--yellow); }
+    .mv-red    { color: var(--red); }
+    .mv-dim    { color: var(--dim); }
+
+    /* ── REACH BAR ── */
+    .reach-bar-wrap {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 10px;
+      margin-top: 8px;
+    }
+    .reach-bar-label { font-size: 0.60rem; color: var(--dim); letter-spacing: 1px; }
+    .reach-bar-track {
+      height: 6px;
+      background: var(--dimmer);
+      border-radius: 3px;
+      margin-top: 6px;
+      position: relative;
+    }
+    .reach-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--green);
+      transition: width 0.3s, background 0.3s;
+    }
+    /* WS zone markers */
+    .ws-marker {
+      position: absolute;
+      top: -2px;
+      width: 2px;
+      height: 10px;
+      background: var(--blue);
+      opacity: 0.7;
+    }
+
+    /* ── YAW INDICATOR ── */
+    .yaw-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .yaw-dial {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: 2px solid var(--border2);
+      background: var(--bg2);
+      position: relative;
+      flex-shrink: 0;
+    }
+    .yaw-needle {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 2px;
+      height: 28px;
+      background: var(--green);
+      transform-origin: bottom center;
+      transform: translateX(-50%) translateY(-100%) rotate(0deg);
+      transition: transform 0.4s;
+      border-radius: 1px;
+    }
+    .yaw-center {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .yaw-text { flex: 1; }
+    .yaw-value { font-size: 1.8rem; font-weight: bold; color: var(--green); }
+    .yaw-src { font-size: 0.62rem; color: var(--dim); margin-top: 2px; }
+
+    /* ── WS STATUS ── */
+    .ws-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      margin-top: 8px;
+      font-size: 0.75rem;
+    }
+    .ws-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── CONTAINERS ── */
+    .containers-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .container-box {
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .container-box.red-box  { border-color: #ff333544; }
+    .container-box.blue-box { border-color: #4488ff44; }
+    .container-label { font-size: 0.60rem; letter-spacing: 2px; color: var(--dim); }
+    .container-count {
+      font-size: 2.4rem;
+      font-weight: bold;
+      margin-top: 4px;
+      line-height: 1;
+    }
+    .container-cubes {
+      font-size: 0.62rem;
+      color: var(--dim);
+      margin-top: 4px;
+    }
+
+    /* ── LOG ── */
+    .log-wrap {
+      background: #03030a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      height: 180px;
+      overflow-y: auto;
+      font-size: 0.68rem;
+      line-height: 1.7;
+      color: var(--dim);
+      margin-top: 12px;
+    }
+    .log-wrap .le { border-bottom: 1px solid #0d0d1a; padding: 1px 0; }
+    .log-wrap .le:last-child { color: #aabbcc; }
+    .log-wrap .le.warn { color: var(--orange); }
+    .log-wrap .le.err  { color: var(--red); }
+
+    /* ── CV BOX ── */
+    .cv-det-box {
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 12px;
+      background: var(--bg2);
+      font-size: 0.75rem;
+      margin-top: 0;
+    }
+    .cv-det-box.detected { border-color: var(--green); color: var(--green); }
+    .cv-det-box.scanning { border-color: var(--dim);   color: var(--dim); }
+
+    /* ── HISTORY TAB ── */
+    .hist-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
+    }
+    .hist-table th {
+      color: var(--blue);
+      text-align: left;
+      padding: 5px 10px;
+      border-bottom: 1px solid var(--border2);
+      letter-spacing: 1px;
+      font-weight: normal;
+    }
+    .hist-table td {
+      padding: 5px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hist-table tr:last-child td { border-bottom: none; }
+    .hist-table tr.new-row { animation: rowIn 0.3s ease; }
+    @keyframes rowIn { from { opacity: 0; transform: translateY(-4px); } to { opacity:1; transform:none; } }
+    .hist-empty { color: var(--dim); text-align: center; padding: 24px; font-size: 0.72rem; }
+    .badge-red   { color: var(--red);    font-weight: bold; }
+    .badge-blue  { color: var(--blue);   font-weight: bold; }
+    .badge-green { color: #00cc44;       font-weight: bold; }
+    .badge-none  { color: var(--dim); }
+    .res-ok   { color: var(--green); }
+    .res-skip { color: var(--yellow); }
+    .res-fail { color: var(--red); }
+    .hist-summary {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .hist-stat {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 16px;
+      text-align: center;
+      min-width: 80px;
+    }
+    .hist-stat-label { font-size: 0.58rem; color: var(--dim); letter-spacing: 1px; }
+    .hist-stat-val   { font-size: 1.6rem; font-weight: bold; margin-top: 2px; }
+
+    /* ── TOAST ── */
+    #toast-container { position:fixed; top:60px; right:16px; z-index:9999; display:flex; flex-direction:column; gap:6px; pointer-events:none; }
+    .toast { padding:8px 14px; border-radius:5px; font-size:0.70rem; letter-spacing:1px; animation:toastIn 0.25s ease; pointer-events:auto; cursor:pointer; }
+    .toast-warn { background:#140800; border:1px solid var(--orange); color:var(--orange); }
+    .toast-err  { background:#140006; border:1px solid var(--red);    color:var(--red); }
+    .toast-ok   { background:#001408; border:1px solid var(--green);  color:var(--green); }
+    @keyframes toastIn { from{transform:translateX(110%);opacity:0} to{transform:none;opacity:1} }
+
+    /* ── OP STATUS ── */
+    .op-status { margin-top:8px; padding:5px 10px; background:var(--bg2); border:1px solid var(--border); border-radius:4px; font-size:0.68rem; letter-spacing:1px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .op-status.live { border-color:var(--green); color:var(--green); }
+    .op-status.done { border-color:#00cc44; color:#00cc44; }
+    .op-status.fail { border-color:var(--red); color:var(--red); }
+
+    /* ── CYCLE TIMER ── */
+    .timer-row { display:flex; gap:6px; margin-top:6px; }
+    .timer-box { flex:1; background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:4px 8px; }
+    .timer-lbl { font-size:0.55rem; color:var(--dim); letter-spacing:1px; }
+    .timer-val { font-size:1.0rem; font-weight:bold; color:var(--yellow); }
+
+    /* ── FILL BAR ── */
+    .fill-bar-wrap { margin-top:5px; }
+    .fill-bar-track { height:5px; background:var(--dimmer); border-radius:3px; overflow:hidden; }
+    .fill-bar-fill { height:100%; border-radius:3px; transition:width 0.4s; }
+
+    /* ── EXPORT BUTTON ── */
+    .export-btn { background:var(--bg2); border:1px solid var(--border); color:var(--dim); font-family:inherit; font-size:0.65rem; letter-spacing:2px; padding:5px 12px; border-radius:4px; cursor:pointer; transition:all 0.15s; }
+    .export-btn:hover { border-color:var(--green); color:var(--green); }
+    .clear-btn { background:var(--bg2); border:1px solid #ff335544; color:var(--dim); font-family:inherit; font-size:0.65rem; letter-spacing:2px; padding:5px 12px; border-radius:4px; cursor:pointer; transition:all 0.15s; }
+    .clear-btn:hover { border-color:var(--red); color:var(--red); }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>DIGITAL TWIN</h1>
+    <div class='sub'>Robot Manipulator | Computer Vision Monitor</div>
+  </div>
+  <div class='hdr-right'>
+    <div id='tick-h'>#-</div>
+    <div id='ts-h' class='meta'>-</div>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class='tabs'>
+  <button class='tab active' onclick='switchTab("telemetry",this)'>TELEMETRY</button>
+  <button class='tab'        onclick='switchTab("cv",this)'>CV DEBUG</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB 1 - TELEMETRY
+════════════════════════════════════════════════════════════ -->
+<div id='tab-telemetry' class='panel active'>
+<div class='grid'>
+
+  <div class='card'>
+    <h3>System Status</h3>
+    <div id='status' class='status-ok'>● STANDBY</div>
+    <div id='warn-list' class='warn-list'></div>
+    <div id='ts' class='meta'>-</div>
+    <div id='op-status' class='op-status'>◎ Waiting for robot...</div>
+    <div class='timer-row'>
+      <div class='timer-box'><div class='timer-lbl'>LAST CYCLE</div><div class='timer-val' id='timer-last'>-</div></div>
+      <div class='timer-box'><div class='timer-lbl'>AVG CYCLE</div><div class='timer-val' id='timer-avg'>-</div></div>
+    </div>
+  </div>
+
+  <div class='card'>
+    <h3>Computer Vision</h3>
+    <div id='cv-status' class='cv-det-box scanning'>◎ Waiting...</div>
+    <div id='cv-coords' class='meta' style='margin-top:6px'>Pixel: -   Area: -</div>
+    <div id='cv-count'  class='meta'>Detections: 0</div>
+    <div style='display:flex;gap:8px;margin-top:10px'>
+      <div style='flex:1;background:var(--bg2);border:1px solid #ff333533;border-radius:5px;padding:6px 8px;text-align:center'>
+        <div style='font-size:0.58rem;color:var(--dim);letter-spacing:1px'>RED</div>
+        <div id='tl-cnt-red'  style='font-size:1.5rem;font-weight:bold;color:var(--red)'>-</div>
+      </div>
+      <div style='flex:1;background:var(--bg2);border:1px solid #4488ff33;border-radius:5px;padding:6px 8px;text-align:center'>
+        <div style='font-size:0.58rem;color:var(--dim);letter-spacing:1px'>BLUE</div>
+        <div id='tl-cnt-blue' style='font-size:1.5rem;font-weight:bold;color:var(--blue)'>-</div>
+      </div>
+    </div>
+  </div>
+
+  <div class='card' style='grid-column:span 2'>
+    <h3>Joint Angles (rad) - 9 joints</h3>
+    <div id='joints' class='joint-row'></div>
+  </div>
+
+  <div class='card'>
+    <h3>Motor Temperature (°C)</h3>
+    <div style='position:relative;height:130px'><canvas id='tempChart'></canvas></div>
+  </div>
+  <div class='card'>
+    <h3>Motor Load (%)</h3>
+    <div style='position:relative;height:130px'><canvas id='loadChart'></canvas></div>
+  </div>
+  <div class='card'>
+    <h3>Joint Velocity (rad/s)</h3>
+    <div style='position:relative;height:130px'><canvas id='velChart'></canvas></div>
+  </div>
+  <div class='card'>
+    <h3>Torque (N·m)</h3>
+    <div style='position:relative;height:130px'><canvas id='torqChart'></canvas></div>
+  </div>
+  <div class='card' style='grid-column:span 2'>
+    <h3>Temperature History - J1 (last 50 ticks)</h3>
+    <div style='position:relative;height:100px'><canvas id='histChart'></canvas></div>
+  </div>
+
+  <!-- ── Performance Stats ──────────────────────────────────────── -->
+  <div class='card' style='grid-column:span 2'>
+    <h3>Performance Stats</h3>
+    <div class='metrics-row' style='grid-template-columns:repeat(5,1fr)'>
+      <div class='metric-box'>
+        <div class='metric-label'>SORTED</div>
+        <div class='metric-value mv-green' id='ps-total'>0</div>
+      </div>
+      <div class='metric-box'>
+        <div class='metric-label'>MIN</div>
+        <div class='metric-value mv-blue' id='ps-min'>-</div>
+      </div>
+      <div class='metric-box'>
+        <div class='metric-label'>AVG</div>
+        <div class='metric-value mv-blue' id='ps-avg'>-</div>
+      </div>
+      <div class='metric-box'>
+        <div class='metric-label'>MAX</div>
+        <div class='metric-value mv-orange' id='ps-max'>-</div>
+      </div>
+      <div class='metric-box'>
+        <div class='metric-label'>cubes/min</div>
+        <div class='metric-value mv-green' id='ps-thr'>-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Twin Sync (Δ CV-USD) - defining DT KPI -->
+  <div class='card' style='grid-column:span 2'>
+    <h3>Twin Sync (Δ CV-USD, last 50 cycles, mm)</h3>
+    <div style='position:relative;height:130px'><canvas id='twinSyncChart'></canvas></div>
+    <div style='display:flex;gap:14px;margin-top:6px;font-size:0.6rem;color:var(--dim);align-items:center;flex-wrap:wrap'>
+      <span style='color:#22dd66'>● Δ_post (after EMA bias)</span>
+      <span style='color:#ff8844'>● Δ_pre (raw CV vs USD)</span>
+      <span style='margin-left:auto'>post mean: <span id='twin-mean' style='color:var(--green)'>-</span> mm</span>
+      <span>pre mean: <span id='twin-pre-mean' style='color:#ff8844'>-</span> mm</span>
+      <span>post last: <span id='twin-last' style='color:var(--blue)'>-</span> mm</span>
+    </div>
+  </div>
+
+  <!-- ── Cycle Time Breakdown (Stacked Bars) ───────────────────── -->
+  <div class='card' style='grid-column:span 2'>
+    <h3>Cycle Time Breakdown - last 12 cycles (s)</h3>
+    <div style='position:relative;height:160px'><canvas id='phaseChart'></canvas></div>
+    <div id='phase-legend' style='display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:0.6rem;color:var(--dim)'></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       WORKSPACE SECTION (moved from a separate tab)
+  ══════════════════════════════════════════════════════════ -->
+
+  <div class='card' style='grid-column:span 2'>
+    <h3>Workspace Map - Top View (m)</h3>
+    <canvas id='ws-canvas' width='640' height='380'
+            style='max-width:100%;display:block;margin:0 auto;background:#06060e;border-radius:4px'></canvas>
+  </div>
+
+  <div class='card' style='grid-column:span 2'>
+    <h3>Work Zones</h3>
+    <div style='font-size:0.60rem;letter-spacing:2px;color:var(--blue);margin-bottom:6px'>HIGH ZONE (z = 0.40m)</div>
+    <div class='metrics-row'>
+      <div class='metric-box'><div class='metric-label'>X min</div><div class='metric-value mv-blue'>0.23</div></div>
+      <div class='metric-box'><div class='metric-label'>X max</div><div class='metric-value mv-blue'>0.77</div></div>
+      <div class='metric-box'><div class='metric-label'>reach</div><div class='metric-value mv-blue'>0.72m</div></div>
+      <div class='metric-box'><div class='metric-label'>Y min</div><div class='metric-value mv-blue'>-0.67</div></div>
+      <div class='metric-box'><div class='metric-label'>Y max</div><div class='metric-value mv-blue'>0.57</div></div>
+      <div class='metric-box'><div class='metric-label'>Z</div><div class='metric-value mv-blue'>0.03-0.82</div></div>
+    </div>
+    <div style='font-size:0.60rem;letter-spacing:2px;color:var(--green);margin-top:12px;margin-bottom:6px'>LOW ZONE (z = 0.05m)</div>
+    <div class='metrics-row'>
+      <div class='metric-box'><div class='metric-label'>X min</div><div class='metric-value mv-green'>0.23</div></div>
+      <div class='metric-box'><div class='metric-label'>X max</div><div class='metric-value mv-green'>0.82</div></div>
+      <div class='metric-box'><div class='metric-label'>reach</div><div class='metric-value mv-green'>0.77m</div></div>
+      <div class='metric-box'><div class='metric-label'>Y min</div><div class='metric-value mv-green'>-0.67</div></div>
+      <div class='metric-box'><div class='metric-label'>Y max</div><div class='metric-value mv-green'>0.62</div></div>
+      <div class='metric-box'><div class='metric-label'>Z</div><div class='metric-value mv-green'>0.005-0.82</div></div>
+    </div>
+  </div>
+
+  <div class='card' style='grid-column:span 2'>
+    <h3>Cubes (X &gt; 0.10m) - Sorting Status</h3>
+    <table id='cube-table' style='width:100%;border-collapse:collapse;font-size:0.7rem'>
+      <thead>
+        <tr style='color:var(--blue);border-bottom:1px solid var(--border2)'>
+          <th style='text-align:left;padding:4px 8px;letter-spacing:1px'>NAME</th>
+          <th style='text-align:left;padding:4px 8px;letter-spacing:1px'>COLOR</th>
+          <th style='text-align:right;padding:4px 8px;letter-spacing:1px'>X</th>
+          <th style='text-align:right;padding:4px 8px;letter-spacing:1px'>Y</th>
+          <th style='text-align:right;padding:4px 8px;letter-spacing:1px'>Z</th>
+          <th style='text-align:right;padding:4px 8px;letter-spacing:1px'>YAW</th>
+          <th style='text-align:center;padding:4px 8px;letter-spacing:1px'>STATUS</th>
+        </tr>
+      </thead>
+      <tbody id='cube-tbody'>
+        <tr><td colspan='7' style='color:var(--dim);padding:8px;text-align:center'>Waiting for data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class='card' style='grid-column:span 2'>
+    <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px'>
+      <h3 style='margin-bottom:0'>Completed Cycles</h3>
+      <div style='display:flex;gap:4px;align-items:center'>
+        <button class='clear-btn' style='padding:3px 8px;font-size:0.55rem' onclick='clearCycleHistory()'>CLEAR</button>
+        <button class='export-btn' style='padding:3px 8px;font-size:0.55rem' onclick='exportLog()'>⬇ EXPORT</button>
+      </div>
+    </div>
+    <div style='font-size:0.55rem;letter-spacing:2px;color:var(--dim);margin-bottom:2px'>SUCCESS RATE (%)</div>
+    <canvas id='successChart' height='30' style='margin-bottom:8px'></canvas>
+    <div class='hist-summary' style='gap:6px;margin-bottom:8px'>
+      <div class='hist-stat' style='padding:4px 0;min-width:0;flex:1'>
+        <div class='hist-stat-label'>TOTAL</div>
+        <div class='hist-stat-val' id='hs-total' style='color:var(--yellow);font-size:1.1rem'>0</div>
+      </div>
+      <div class='hist-stat' style='padding:4px 0;min-width:0;flex:1'>
+        <div class='hist-stat-label'>RED</div>
+        <div class='hist-stat-val badge-red' id='hs-red' style='font-size:1.1rem'>0</div>
+      </div>
+      <div class='hist-stat' style='padding:4px 0;min-width:0;flex:1'>
+        <div class='hist-stat-label'>BLUE</div>
+        <div class='hist-stat-val badge-blue' id='hs-blue' style='font-size:1.1rem'>0</div>
+      </div>
+      <div class='hist-stat' style='padding:4px 0;min-width:0;flex:1'>
+        <div class='hist-stat-label'>SKIP</div>
+        <div class='hist-stat-val badge-green' id='hs-green' style='font-size:1.1rem'>0</div>
+      </div>
+      <div class='hist-stat' style='padding:4px 0;min-width:0;flex:1'>
+        <div class='hist-stat-label'>FAIL</div>
+        <div class='hist-stat-val' id='hs-fail' style='color:var(--orange);font-size:1.1rem'>0</div>
+      </div>
+    </div>
+    <div style='max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:4px'>
+      <table class='hist-table' style='font-size:0.65rem'>
+        <thead>
+          <tr>
+            <th style='padding:3px 6px'>#</th>
+            <th style='padding:3px 6px'>TIME</th>
+            <th style='padding:3px 6px'>COLOR</th>
+            <th style='padding:3px 6px'>RESULT</th>
+          </tr>
+        </thead>
+        <tbody id='hist-tbody'>
+          <tr><td colspan='4' class='hist-empty' style='padding:14px;font-size:0.65rem'>Waiting for first cycle...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB 2 - CV DEBUG
+════════════════════════════════════════════════════════════ -->
+<div id='tab-cv' class='panel'>
+
+  <!-- TOP: video streams side-by-side -->
+  <div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:1800px;margin:0 auto 14px'>
+    <div class='cv-feed-wrap' id='rgb-wrap'>
+      <span class='cv-feed-label'>RGB + DETECTION</span>
+      <img id='rgb-img' src='/stream/rgb' alt='RGB Stream'>
+    </div>
+    <div class='cv-feed-wrap' id='depth-wrap'>
+      <span class='cv-feed-label'>DEPTH MAP</span>
+      <img id='depth-img' src='/stream/depth' alt='Depth Stream'>
+    </div>
+  </div>
+
+  <!-- BOTTOM: metrics grid -->
+  <div class='grid'>
+
+    <div class='card' style='grid-column:span 2'>
+      <h3>Detection</h3>
+      <div id='cv-det-main' class='cv-det-box scanning'>◎ Scanning...</div>
+      <div class='yaw-wrap' style='margin-top:10px'>
+        <div class='yaw-dial'>
+          <div class='yaw-needle' id='yaw-needle'></div>
+          <div class='yaw-center'></div>
+        </div>
+        <div class='yaw-text'>
+          <div class='yaw-value'><span id='yaw-val'>-</span>°</div>
+          <div class='yaw-src'>grip_yaw</div>
+          <div style='margin-top:4px;font-size:0.65rem;color:var(--dim)'>
+            cv: <span id='cv-yaw-val' style='color:var(--blue)'>-</span>°
+            &nbsp;|&nbsp;
+            usd: <span id='usd-yaw-val' style='color:var(--yellow)'>-</span>°
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class='card' style='grid-column:span 2'>
+      <h3>World Coordinates</h3>
+      <div class='metrics-row'>
+        <div class='metric-box'>
+          <div class='metric-label'>WORLD X</div>
+          <div class='metric-value mv-green' id='m-x'>-</div>
+        </div>
+        <div class='metric-box'>
+          <div class='metric-label'>WORLD Y</div>
+          <div class='metric-value mv-green' id='m-y'>-</div>
+        </div>
+        <div class='metric-box'>
+          <div class='metric-label'>WORLD Z</div>
+          <div class='metric-value mv-green' id='m-z'>-</div>
+        </div>
+        <div class='metric-box'>
+          <div class='metric-label'>WIDTH</div>
+          <div class='metric-value mv-blue' id='m-w'>-</div>
+        </div>
+        <div class='metric-box'>
+          <div class='metric-label'>HEIGHT</div>
+          <div class='metric-value mv-blue' id='m-h'>-</div>
+        </div>
+        <div class='metric-box'>
+          <div class='metric-label'>SIZE</div>
+          <div class='metric-value mv-orange' id='m-size'>-</div>
+        </div>
+      </div>
+    </div>
+
+    <div class='card' style='grid-column:span 2'>
+      <h3>Reach &amp; Workspace</h3>
+      <div class='reach-bar-wrap'>
+        <div class='reach-bar-label'>REACH FROM BASE</div>
+        <div style='display:flex;justify-content:space-between;margin-top:4px'>
+          <span id='reach-val' style='font-size:0.8rem;color:var(--green)'>- m</span>
+          <span style='font-size:0.65rem;color:var(--dim)'>max 0.77m</span>
+        </div>
+        <div class='reach-bar-track'>
+          <div class='reach-bar-fill' id='reach-bar' style='width:0%'></div>
+          <div class='ws-marker' style='left:29.9%' title='X min 0.23'></div>
+          <div class='ws-marker' style='left:94.8%' title='reach max 0.77'></div>
+        </div>
+      </div>
+      <div class='ws-status' id='ws-status-box' style='margin-top:10px'>
+        <div class='ws-dot' id='ws-dot' style='background:var(--dim)'></div>
+        <span id='ws-status-text'>Waiting for coordinates...</span>
+      </div>
+    </div>
+
+    <div class='card' style='grid-column:span 2'>
+      <h3>Containers</h3>
+      <div class='containers-row'>
+        <div class='container-box red-box'>
+          <div class='container-label'>RED</div>
+          <div class='container-count' id='cnt-red' style='color:var(--red)'>-</div>
+          <div class='container-cubes' id='cnt-red-cubes'>cubes</div>
+          <div class='fill-bar-wrap'><div class='fill-bar-track'><div class='fill-bar-fill' id='fill-red' style='width:0%;background:var(--red)'></div></div></div>
+          <div style='font-size:0.55rem;color:var(--dim);margin-top:2px;text-align:right' id='fill-red-label'>0 / 6</div>
+        </div>
+        <div class='container-box blue-box'>
+          <div class='container-label'>BLUE</div>
+          <div class='container-count' id='cnt-blue' style='color:var(--blue)'>-</div>
+          <div class='container-cubes' id='cnt-blue-cubes'>cubes</div>
+          <div class='fill-bar-wrap'><div class='fill-bar-track'><div class='fill-bar-fill' id='fill-blue' style='width:0%;background:var(--blue)'></div></div></div>
+          <div style='font-size:0.55rem;color:var(--dim);margin-top:2px;text-align:right' id='fill-blue-label'>0 / 6</div>
+        </div>
+      </div>
+    </div>
+
+    <div class='card' style='grid-column:1/-1'>
+      <h3>CV Log</h3>
+      <div class='log-wrap' id='cv-log' style='height:140px;overflow-y:auto'></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════ */
+function switchTab(name, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+  // CV tab just became visible - scroll the log to the bottom now (while it
+  // was hidden, clientHeight=0 and the browser couldn't apply scrollTop).
+  if (name === 'cv') {
+    setTimeout(() => {
+      const logEl = document.getElementById('cv-log');
+      if (logEl) {
+        logEl.scrollTop = logEl.scrollHeight;
+        _logUserAtBottom = true;
+      }
+    }, 30);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   CHART.JS helpers
+═══════════════════════════════════════════ */
+const L = ['J1','J2','J3','J4','J5','J6','J7','J8','J9'];
+const mk = (id, color, type='bar', yMin=undefined, yMax=undefined, stepSize=undefined) => new Chart(
+  document.getElementById(id).getContext('2d'), {
+    type,
+    data: { labels: type==='line' ? [] : L,
+            datasets:[{ data: type==='line' ? [] : Array(9).fill(0),
+                        backgroundColor: color+'55', borderColor: color,
+                        borderWidth: 1.5, tension: 0.4, fill: type==='line' }] },
+    options: { animation:false, responsive:true, maintainAspectRatio:false,
+               plugins:{legend:{display:false}},
+               scales: {
+                 x:{ticks:{color:'#334455',font:{size:10}}, grid:{color:'#111122'}},
+                 y:{ticks:{color:'#334455',font:{size:10}, ...(stepSize !== undefined ? {stepSize} : {})},
+                    grid:{color:'#111122'},
+                    ...(yMin !== undefined ? {min: yMin} : {}),
+                    ...(yMax !== undefined ? {max: yMax} : {}) } }}
+  }
+);
+const charts = {
+  temp: mk('tempChart','#ff6b35','bar', 30,  50, 5),
+  load: mk('loadChart','#4488ff','bar',  0,  50, 10),
+  vel:  mk('velChart', '#00ff88','bar', -1.5, 1.5),
+  torq: mk('torqChart','#ffcc00','bar',  0,  10),
+  hist: mk('histChart','#ff6b35','line',30,  50),
+};
+const histData = [];
+let cvCount = 0;
+
+// Chart.js with responsive:true sometimes miscalculates sizes on the first
+// render in fullscreen mode - force a resize once the DOM has settled.
+window.addEventListener('load', () => {
+  setTimeout(() => Object.values(charts).forEach(c => c.resize()), 120);
+});
+
+function pad(arr, n=9) {
+  return arr ? [...arr, ...Array(n).fill(0)].slice(0,n) : Array(n).fill(0);
+}
+function updateJoints(angles, temps) {
+  document.getElementById('joints').innerHTML = (angles||[]).map((a,i) => {
+    const t = temps && temps[i] != null ? temps[i] : 0;
+    const hot = t > 70;
+    const s = hot ? 'border-color:var(--red);color:var(--red)' : '';
+    return `<div class='jv' style='${s}' title='${t.toFixed(1)}°C'>${a.toFixed(2)}<span>J${i+1}</span></div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════
+   WORKSPACE CANVAS
+═══════════════════════════════════════════ */
+let lastXYZ  = null;
+let lastCubes = [];
+
+const CUBE_COLORS = {
+  red:   { fill: '#ff333588', stroke: '#ff3355', dim: '#552233' },
+  blue:  { fill: '#4488ff88', stroke: '#4488ff', dim: '#223355' },
+  green: { fill: '#00cc4488', stroke: '#00cc44', dim: '#113322' },
+};
+
+function drawWorkspace(xyz, cubes) {
+  const canvas = document.getElementById('ws-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const OX = 140, OY = 210;
+  const SCALE = 230;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#06060e';
+  ctx.fillRect(0, 0, W, H);
+
+  function toCanvas(wx, wy) {
+    return [OX + wx * SCALE, OY - wy * SCALE];
+  }
+
+  // Grid
+  ctx.strokeStyle = '#0d1020';
+  ctx.lineWidth = 1;
+  for (let x = -0.6; x <= 1.0; x += 0.2) {
+    const [cx0, cy0] = toCanvas(x, -0.9);
+    const [cx1, cy1] = toCanvas(x,  0.9);
+    ctx.beginPath(); ctx.moveTo(cx0, cy0); ctx.lineTo(cx1, cy1); ctx.stroke();
+  }
+  for (let y = -0.8; y <= 0.8; y += 0.2) {
+    const [cx0, cy0] = toCanvas(-0.1, y);
+    const [cx1, cy1] = toCanvas(1.0, y);
+    ctx.beginPath(); ctx.moveTo(cx0, cy0); ctx.lineTo(cx1, cy1); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = '#223344';
+  ctx.lineWidth = 1;
+  const [ax0] = toCanvas(-0.1, 0); const [ax1] = toCanvas(1.0, 0);
+  ctx.beginPath(); ctx.moveTo(ax0, OY); ctx.lineTo(ax1, OY); ctx.stroke();
+  const [, ay0] = toCanvas(0, -0.8); const [, ay1] = toCanvas(0, 0.75);
+  ctx.beginPath(); ctx.moveTo(OX, ay0); ctx.lineTo(OX, ay1); ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = '#334455'; ctx.font = '10px Courier New'; ctx.textAlign = 'center';
+  for (let v = 0.2; v <= 0.9; v += 0.2) {
+    const [cx, cy] = toCanvas(v, 0);
+    ctx.fillText(v.toFixed(1), cx, OY + 14);
+  }
+  ctx.textAlign = 'right';
+  for (let v = -0.6; v <= 0.6; v += 0.2) {
+    if (Math.abs(v) < 0.01) continue;
+    const [, cy] = toCanvas(0, v);
+    ctx.fillText(v.toFixed(1), OX - 6, cy + 4);
+  }
+  ctx.fillStyle = '#445566'; ctx.textAlign = 'center';
+  ctx.fillText('X, m', toCanvas(0.95, 0)[0], OY + 26);
+  ctx.save(); ctx.translate(OX - 30, toCanvas(0, 0.65)[1]);
+  ctx.rotate(-Math.PI/2); ctx.fillText('Y, m', 0, 0); ctx.restore();
+
+  // LOW zone rect
+  const [lx0, ly0] = toCanvas(0.23, 0.62);
+  const [lx1, ly1] = toCanvas(0.82, -0.67);
+  ctx.fillStyle = '#00ff8810';
+  ctx.fillRect(lx0, ly0, lx1-lx0, ly1-ly0);
+  ctx.strokeStyle = '#00ff8866'; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
+  ctx.strokeRect(lx0, ly0, lx1-lx0, ly1-ly0);
+  ctx.setLineDash([]);
+
+  // HIGH zone rect
+  const [hx0, hy0] = toCanvas(0.23, 0.57);
+  const [hx1, hy1] = toCanvas(0.77, -0.67);
+  ctx.strokeStyle = '#4488ff66'; ctx.lineWidth = 1; ctx.setLineDash([6,6]);
+  ctx.strokeRect(hx0, hy0, hx1-hx0, hy1-hy0);
+  ctx.setLineDash([]);
+
+  // LOW reach arc
+  ctx.beginPath();
+  ctx.arc(OX, OY, 0.77 * SCALE, -Math.PI * 1.2, Math.PI * 0.2);
+  ctx.strokeStyle = '#00ff8855'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // HIGH reach arc
+  ctx.beginPath();
+  ctx.arc(OX, OY, 0.72 * SCALE, -Math.PI * 1.2, Math.PI * 0.2);
+  ctx.strokeStyle = '#4488ff44'; ctx.lineWidth = 1; ctx.setLineDash([5,5]);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // ── Containers ──────────────────────────────────────────────
+  const containers = [{xyz:[0, 0.45], color:'#ff3355', label:'RED'},
+                      {xyz:[0,-0.55], color:'#4488ff', label:'BLUE'}];
+  const CONT_R = 0.08 * SCALE; // ~18px
+  for (const cont of containers) {
+    const [cx, cy] = toCanvas(cont.xyz[0], cont.xyz[1]);
+    ctx.beginPath(); ctx.arc(cx, cy, CONT_R, 0, Math.PI*2);
+    ctx.fillStyle = cont.color + '22';
+    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, CONT_R, 0, Math.PI*2);
+    ctx.strokeStyle = cont.color + '99'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]);
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = 'bold 9px Courier New'; ctx.textAlign = 'center';
+    ctx.fillStyle = cont.color;
+    ctx.fillText(cont.label, cx, cy + 4);
+  }
+
+  // ── USD Cubes ────────────────────────────────────────────────
+  // Treat passed cubes as authoritative: [] explicitly clears, null/undefined
+  // means "caller didn't have data" -> fall back to last known set.
+  const cubeList = Array.isArray(cubes) ? cubes : lastCubes;
+  if (Array.isArray(cubes)) lastCubes = cubes;
+
+  for (const cube of cubeList) {
+    const [wx, wy] = [cube.xyz[0], cube.xyz[1]];
+    if (wx < 0.10) continue;          // filter out cubes left of 0.10m
+    const [cx, cy] = toCanvas(wx, wy);
+    const palette = CUBE_COLORS[cube.color] || CUBE_COLORS.green;
+    const R = 7;
+
+    if (cube.processed) {
+      // Processed: dim outline + ✓
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2);
+      ctx.strokeStyle = palette.dim; ctx.lineWidth = 1.5;
+      ctx.setLineDash([2,2]); ctx.stroke(); ctx.setLineDash([]);
+      // cross-out line
+      ctx.beginPath(); ctx.moveTo(cx-R, cy-R); ctx.lineTo(cx+R, cy+R);
+      ctx.strokeStyle = palette.dim; ctx.lineWidth = 1;
+      ctx.stroke();
+    } else {
+      // Active: filled circle
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2);
+      ctx.fillStyle = palette.fill; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2);
+      ctx.strokeStyle = palette.stroke; ctx.lineWidth = 1.5; ctx.stroke();
+      // Yaw arrow
+      const rad = cube.yaw_deg * Math.PI / 180;
+      const ax = cx + 14 * Math.cos(rad);
+      const ay = cy - 14 * Math.sin(rad);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ax, ay);
+      ctx.strokeStyle = palette.stroke; ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Label
+    const labelColor = cube.processed ? '#334455' : palette.stroke;
+    ctx.font = (cube.processed ? '' : 'bold ') + '9px Courier New';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#00000088';
+    ctx.fillRect(cx + R + 2, cy - 8, 44, 10);
+    ctx.fillStyle = labelColor;
+    ctx.fillText(cube.label, cx + R + 3, cy);
+    if (!cube.processed) {
+      ctx.fillStyle = '#556677';
+      ctx.fillText(`(${wx.toFixed(2)},${wy.toFixed(2)})`, cx + R + 3, cy + 10);
+    }
+  }
+
+  // Legend
+  ctx.font = '10px Courier New'; ctx.textAlign = 'left';
+  const lx = W - 180, ly = 16;
+  ctx.fillStyle = '#00ff8866'; ctx.fillRect(lx, ly, 12, 8);
+  ctx.fillStyle = '#778899'; ctx.fillText('Low z=0.05m (pick)', lx+16, ly+8);
+  ctx.strokeStyle = '#4488ff66'; ctx.setLineDash([5,5]);
+  ctx.strokeRect(lx, ly+16, 12, 8); ctx.setLineDash([]);
+  ctx.fillStyle = '#778899'; ctx.fillText('High z=0.40m (transit)', lx+16, ly+24);
+  // cube legend
+  ctx.fillStyle = '#ff333588'; ctx.beginPath(); ctx.arc(lx+6, ly+40, 5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#778899'; ctx.fillText('pending sort', lx+16, ly+44);
+  ctx.strokeStyle = '#552233'; ctx.lineWidth=1; ctx.setLineDash([2,2]);
+  ctx.beginPath(); ctx.arc(lx+6, ly+56, 5, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(lx+1,ly+51); ctx.lineTo(lx+11,ly+61); ctx.stroke();
+  ctx.fillStyle = '#445566'; ctx.fillText('sorted', lx+16, ly+60);
+
+  // Robot base
+  ctx.beginPath(); ctx.arc(OX, OY, 8, 0, Math.PI*2);
+  ctx.fillStyle = '#00ff88'; ctx.fill();
+  ctx.beginPath(); ctx.arc(OX, OY, 3, 0, Math.PI*2);
+  ctx.fillStyle = '#06060e'; ctx.fill();
+
+  // Current CV target. Update lastXYZ tracking explicitly so that
+  // when xyz becomes null (skip/fail/place), the stale marker disappears
+  // instead of being held over from the previous cycle.
+  if (xyz) {
+    lastXYZ = xyz;
+  } else if (xyz === null) {
+    lastXYZ = null;
+  }
+  const p = xyz || lastXYZ;
+  if (p) {
+    const [cx, cy] = toCanvas(p[0], p[1]);
+    const reach = Math.sqrt(p[0]**2 + p[1]**2);
+    const inZone = reach <= 0.77 && p[0] >= 0.23 && p[0] <= 0.82 &&
+                   p[1] >= -0.67 && p[1] <= 0.62;
+    const color = inZone ? '#ffcc00' : '#ff6644';
+
+    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI*2);
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx-6, cy); ctx.lineTo(cx+6, cy);
+    ctx.moveTo(cx, cy-6); ctx.lineTo(cx, cy+6);
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+
+    ctx.beginPath(); ctx.moveTo(OX, OY); ctx.lineTo(cx, cy);
+    ctx.strokeStyle = color + '55'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.stroke(); ctx.setLineDash([]);
+
+    ctx.font = '10px Courier New'; ctx.textAlign = 'left'; ctx.fillStyle = color;
+    ctx.fillText(`CV [${p[0].toFixed(2)}, ${p[1].toFixed(2)}]`, cx+13, cy+4);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   CUBE TABLE
+═══════════════════════════════════════════ */
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+const COLOR_BADGE = {
+  red:   '<span style="color:#ff3355;font-weight:bold">■ RED</span>',
+  blue:  '<span style="color:#4488ff;font-weight:bold">■ BLUE</span>',
+  green: '<span style="color:#00cc44;font-weight:bold">■ GREEN</span>',
+};
+
+function updateCubeTable(cubes) {
+  const tbody = document.getElementById('cube-tbody');
+  if (!tbody) return;
+  const sorted = [...cubes].filter(c => c.xyz[0] >= 0.10)
+                            .sort((a, b) => a.xyz[0] - b.xyz[0]);
+  if (!sorted.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--dim);padding:8px;text-align:center">No cubes (X > 0.10m)</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sorted.map(c => {
+    const done = c.processed;
+    const rowStyle = done ? 'opacity:0.4' : '';
+    const colorCell = COLOR_BADGE[c.color] || escapeHtml(c.color);
+    const status = done
+      ? '<span style="color:#00ff88">✓ sorted</span>'
+      : '<span style="color:#ffcc00;animation:blink 1s infinite">◉ pending</span>';
+    return `<tr style="${rowStyle};border-bottom:1px solid var(--border)">
+      <td style="padding:5px 8px;font-weight:bold">${escapeHtml(c.label)}</td>
+      <td style="padding:5px 8px">${colorCell}</td>
+      <td style="padding:5px 8px;text-align:right;color:var(--green)">${c.xyz[0].toFixed(3)}</td>
+      <td style="padding:5px 8px;text-align:right;color:var(--green)">${c.xyz[1].toFixed(3)}</td>
+      <td style="padding:5px 8px;text-align:right;color:var(--dim)">${c.xyz[2].toFixed(3)}</td>
+      <td style="padding:5px 8px;text-align:right;color:var(--dim)">${c.yaw_deg.toFixed(1)}°</td>
+      <td style="padding:5px 8px;text-align:center">${status}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════
+   TELEMETRY POLL (/api/telemetry)
+═══════════════════════════════════════════ */
+let _telemetryBusy = false;
+async function pollTelemetry() {
+  if (document.hidden) return;
+  if (_telemetryBusy) return;
+  _telemetryBusy = true;
+  try {
+    const d = await (await fetch('/api/telemetry', {signal: AbortSignal.timeout(800)})).json();
+    if (!d.timestamp) return;
+
+    document.getElementById('tick-h').textContent = '#' + d.tick;
+    document.getElementById('ts-h').textContent   = d.timestamp.slice(11,19);
+    document.getElementById('ts').textContent     = 'Updated: ' + d.timestamp.slice(11,19);
+
+    const st = document.getElementById('status');
+    st.textContent = d.status==='OK' ? '● OK' : '⚠ WARNING';
+    st.className   = d.status==='OK' ? 'status-ok' : 'status-warn';
+    document.getElementById('warn-list').innerHTML =
+      (d.warnings||[]).map(w=>`<div class='warn-item'>▸ ${escapeHtml(w)}</div>`).join('');
+
+    const cvBox = document.getElementById('cv-status');
+    if (d.target_detected) {
+      cvCount++;
+      cvBox.textContent = '◉ TARGET DETECTED';
+      cvBox.className   = 'cv-det-box detected';
+      document.getElementById('cv-coords').textContent =
+        `Pixel: (${d.target_pixel[0]}, ${d.target_pixel[1]})  Area: ${(d.target_area||0).toFixed(0)}`;
+    } else {
+      cvBox.textContent = '◎ Scanning...';
+      cvBox.className   = 'cv-det-box scanning';
+    }
+    document.getElementById('cv-count').textContent = 'Detections: ' + cvCount;
+
+    updateJoints(d.joint_angles, d.motor_temps);
+    (d.warnings||[]).forEach(w => {
+      if (w === 'OVERHEAT' && !_toastShown.has('OVERHEAT')) {
+        showToast('⚠ MOTOR OVERHEAT', 'warn');
+        _toastShown.add('OVERHEAT'); setTimeout(()=>_toastShown.delete('OVERHEAT'), 12000);
+      }
+      if (w === 'OVERLOAD' && !_toastShown.has('OVERLOAD')) {
+        showToast('⚠ MOTOR OVERLOAD', 'err');
+        _toastShown.add('OVERLOAD'); setTimeout(()=>_toastShown.delete('OVERLOAD'), 12000);
+      }
+    });
+    charts.temp.data.datasets[0].data = pad(d.motor_temps); charts.temp.update('none');
+    charts.load.data.datasets[0].data = pad(d.motor_loads); charts.load.update('none');
+    charts.vel.data.datasets[0].data  = pad(d.joint_vels);  charts.vel.update('none');
+    charts.torq.data.datasets[0].data = pad(d.torques);     charts.torq.update('none');
+
+    histData.push(d.motor_temps ? d.motor_temps[0] : 0);
+    // 52 instead of 50: Chart.js line+tension visually crops 1-2 edge points,
+    // so the +2 buffer keeps a full 50-tick range visible to the user.
+    if (histData.length > 52) histData.shift();
+    charts.hist.data.labels = histData.map((_,i) => i);
+    charts.hist.data.datasets[0].data = [...histData];
+    charts.hist.update('none');
+  } catch(e) {
+  } finally {
+    _telemetryBusy = false;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   CV DEBUG POLL (/api - port 5000)
+═══════════════════════════════════════════ */
+const CV_URL = '/api/cv';
+let _cvBusy = false;
+let _logUserAtBottom = true;   // user is at the log bottom - auto-scroll active
+
+// Watch scroll events: if the user scrolled up by >30px, pause auto-scroll;
+// resume as soon as they return to the bottom.
+window.addEventListener('DOMContentLoaded', () => {
+  const logEl = document.getElementById('cv-log');
+  if (!logEl) return;
+  logEl.addEventListener('scroll', () => {
+    const dist = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight;
+    _logUserAtBottom = dist < 30;
+  });
+});
+
+async function pollCV() {
+  if (document.hidden) return;
+  if (_cvBusy) return;
+  _cvBusy = true;
+  try {
+    const d = await (await fetch(CV_URL, {signal: AbortSignal.timeout(800)})).json();
+
+    // Images: MJPEG streams via /stream/rgb and /stream/depth
+
+    // Det status
+    const det = d.detection;
+    const mainBox = document.getElementById('cv-det-main');
+    if (det) {
+      mainBox.textContent = `◉ DETECTED  px=(${det.pixel_x},${det.pixel_y})`;
+      mainBox.className = 'cv-det-box detected';
+    } else {
+      mainBox.textContent = '◎ Scanning...';
+      mainBox.className = 'cv-det-box scanning';
+    }
+
+    // YAW
+    const yaw = det?.angle_deg ?? null;
+    const cvYaw = det?.world_yaw ?? null;
+    const usdYaw = det?.usd_yaw ?? null;
+    document.getElementById('yaw-val').textContent   = yaw != null ? yaw.toFixed(1) : '-';
+    document.getElementById('cv-yaw-val').textContent  = cvYaw != null ? cvYaw.toFixed(1) : '-';
+    document.getElementById('usd-yaw-val').textContent = usdYaw != null ? usdYaw.toFixed(1) : 'N/A';
+    if (yaw != null) {
+      document.getElementById('yaw-needle').style.transform =
+        `translateX(-50%) translateY(-100%) rotate(${yaw}deg)`;
+    }
+
+    // Metrics
+    const set = (id, val, cls) => {
+      const el = document.getElementById(id);
+      el.textContent = val;
+      el.className = 'metric-value ' + cls;
+    };
+    if (det) {
+      set('m-x', (det.pixel_x !== undefined ? '-' : '-'), 'mv-green');
+      set('m-w', ((det.width_m||0)*100).toFixed(1)+'cm', 'mv-blue');
+      set('m-h', ((det.height_m||0)*100).toFixed(1)+'cm', 'mv-blue');
+      set('m-size', ((det.size_m||0)*100).toFixed(1)+'cm', 'mv-orange');
+    }
+    const xyz = d.world_xyz;
+    if (xyz) {
+      set('m-x', xyz[0].toFixed(3), 'mv-green');
+      set('m-y', xyz[1].toFixed(3), 'mv-green');
+      set('m-z', xyz[2].toFixed(3), 'mv-green');
+      const reach = Math.sqrt(xyz[0]**2 + xyz[1]**2);
+      document.getElementById('reach-val').textContent = reach.toFixed(3) + ' m';
+      const pct = Math.min(reach / 0.77 * 100, 100);
+      const bar = document.getElementById('reach-bar');
+      bar.style.width = pct + '%';
+      bar.style.background = reach <= 0.77 ? 'var(--green)' : 'var(--red)';
+
+      // WS status
+      const inLow = reach <= 0.77 && xyz[0] >= 0.23 && xyz[0] <= 0.82 &&
+                    xyz[1] >= -0.67 && xyz[1] <= 0.62;
+      const inHigh = reach <= 0.72 && xyz[0] >= 0.23 && xyz[0] <= 0.77 &&
+                     xyz[1] >= -0.67 && xyz[1] <= 0.57;
+      const dot = document.getElementById('ws-dot');
+      const txt = document.getElementById('ws-status-text');
+      if (inLow) {
+        dot.style.background = 'var(--green)';
+        txt.textContent = inHigh ? '✓ In High + Low zone' : '✓ In Low zone (pick)';
+        txt.style.color = 'var(--green)';
+      } else {
+        dot.style.background = 'var(--red)';
+        txt.textContent = `⚠ OUT OF RANGE - reach=${reach.toFixed(2)}m`;
+        txt.style.color = 'var(--red)';
+      }
+
+    }
+    // Always redraw - empty cubes [] must clear stale labels, otherwise the
+    // map shows positions from a previous cycle until new cubes appear.
+    drawWorkspace(xyz ?? null, Array.isArray(d.cubes) ? d.cubes : null);
+
+    // Cube sort table
+    if (d.cubes) {
+      updateCubeTable(d.cubes);
+    }
+
+    // Container counts
+    if (d.containers) {
+      const r = d.containers.red  ?? 0;
+      const b = d.containers.blue ?? 0;
+      document.getElementById('cnt-red').textContent  = r;
+      document.getElementById('cnt-blue').textContent = b;
+      document.getElementById('cnt-red-cubes').textContent  = r === 1 ? 'cube' : 'cubes';
+      document.getElementById('cnt-blue-cubes').textContent = b === 1 ? 'cube' : 'cubes';
+      // Telemetry tab mirrors
+      document.getElementById('tl-cnt-red').textContent  = r;
+      document.getElementById('tl-cnt-blue').textContent = b;
+    }
+
+    // Log - auto-scroll to the bottom, EXCEPT when the user scrolled up
+    // themselves (detected by distance-from-bottom > 30px), or while the tab
+    // is hidden (then clientHeight=0; we defer until it's switched back).
+    const logEl = document.getElementById('cv-log');
+    if (d.log) {
+      const visible = logEl.clientHeight > 0;
+      const dist = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight;
+      const wasAtBottom = !visible || dist < 30 || _logUserAtBottom;
+      logEl.innerHTML = d.log.map(l => {
+        const cls = l.includes('⚠') || l.includes('Out of') ? 'warn' :
+                    l.includes('✗') || l.includes('error') ? 'err' : '';
+        return `<div class='le ${cls}'>${escapeHtml(l)}</div>`;
+      }).join('');
+      if (wasAtBottom) {
+        logEl.scrollTop = logEl.scrollHeight;
+        _logUserAtBottom = true;
+      }
+    }
+
+    // Operation status + cycle timer
+    if (d.status) {
+      const opEl = document.getElementById('op-status');
+      opEl.textContent = d.status;
+      opEl.className = 'op-status' +
+        (d.status.startsWith('✓') ? ' done' :
+         d.status.includes('✗') || d.status.includes('fail') ? ' fail' :
+         d.status.includes('Waiting') ? '' : ' live');
+    }
+    if (d.last_cycle_time != null) document.getElementById('timer-last').textContent = d.last_cycle_time + 's';
+    if (d.avg_cycle_time  != null) document.getElementById('timer-avg').textContent  = d.avg_cycle_time  + 's';
+
+    // Fill bars
+    if (d.containers) {
+      const CAP = 6;
+      const r = d.containers.red  ?? 0;
+      const b = d.containers.blue ?? 0;
+      document.getElementById('fill-red').style.width  = Math.min(r/CAP*100, 100) + '%';
+      document.getElementById('fill-blue').style.width = Math.min(b/CAP*100, 100) + '%';
+      document.getElementById('fill-red-label').textContent  = r + ' / ' + CAP;
+      document.getElementById('fill-blue-label').textContent = b + ' / ' + CAP;
+      if (r >= CAP && !_toastShown.has('red-full')) {
+        showToast('RED container full (6/6)', 'ok');
+        _toastShown.add('red-full'); setTimeout(()=>_toastShown.delete('red-full'), 30000);
+      }
+      if (b >= CAP && !_toastShown.has('blue-full')) {
+        showToast('BLUE container full (6/6)', 'ok');
+        _toastShown.add('blue-full'); setTimeout(()=>_toastShown.delete('blue-full'), 30000);
+      }
+    }
+
+    // History
+    if (d.cycle_log) updateHistoryTab(d.cycle_log);
+
+    // ── Portfolio dashboards ────────────────────────────────────
+    updatePerfStats(d);
+    if (d.phase_timings_log) updatePhaseChart(d.phase_timings_log);
+    if (d.twin_sync_history) updateTwinSyncChart(d.twin_sync_history, d.twin_sync_pre_bias_history);
+
+  } catch(e) {
+    // CV server offline
+    document.getElementById('cv-det-main').textContent = '◎ CV server offline (localhost:5000)';
+    document.getElementById('cv-det-main').className = 'cv-det-box scanning';
+  } finally {
+    _cvBusy = false;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════ */
+const _toastShown = new Set();
+function showToast(msg, type='warn', ms=4500) {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  el.onclick = () => el.remove();
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => { el.style.transition='opacity 0.4s'; el.style.opacity='0'; setTimeout(()=>el.remove(),400); }, ms);
+}
+
+/* ═══════════════════════════════════════════
+   LOG EXPORT
+═══════════════════════════════════════════ */
+function exportLog() {
+  fetch('/api/log').then(r => r.json()).then(data => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'telemetry_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.json';
+    a.click();
+  }).catch(() => showToast('Export failed - no log file yet', 'err'));
+}
+
+function resetCycleHistoryView() {
+  lastCycleLog = [];
+  _lastHistLen = 0;
+  document.getElementById('hs-total').textContent = '0';
+  document.getElementById('hs-red').textContent   = '0';
+  document.getElementById('hs-blue').textContent  = '0';
+  document.getElementById('hs-green').textContent = '0';
+  document.getElementById('hs-fail').textContent  = '0';
+  document.getElementById('hist-tbody').innerHTML =
+    "<tr><td colspan='4' class='hist-empty'>Waiting for first cycle...</td></tr>";
+  successChart.data.labels = [];
+  successChart.data.datasets[0].data = [];
+  successChart.update();
+
+  // Performance Stats card mirrors the same backend state - reset its
+  // per-cycle figures immediately rather than waiting for the next poll.
+  ['ps-total'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = '0'; });
+  ['ps-min', 'ps-avg', 'ps-max'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = '-'; });
+  const cpm = document.getElementById('ps-cpm'); if (cpm) cpm.textContent = '-';
+
+  // Twin-Sync chart was populated from the now-cleared history series.
+  if (typeof twinSyncChart !== 'undefined') {
+    twinSyncChart.data.labels = [];
+    twinSyncChart.data.datasets[0].data = [];
+    twinSyncChart.data.datasets[1].data = [];
+    twinSyncChart.update();
+    const meanEl = document.getElementById('twin-mean'); if (meanEl) meanEl.textContent = '-';
+    const lastEl = document.getElementById('twin-last'); if (lastEl) lastEl.textContent = '-';
+    const preEl  = document.getElementById('twin-pre-mean'); if (preEl) preEl.textContent = '-';
+  }
+
+  // Cube-level views: drop the per-cube 'processed' state immediately so the
+  // user does not see stale 'already sorted' badges between CLEAR and the
+  // next orchestrator push.
+  if (typeof updateCubeTable === 'function') updateCubeTable([]);
+  if (typeof drawWorkspace === 'function') drawWorkspace(null, []);
+  lastCubes = null;
+}
+
+function clearCycleHistory() {
+  fetch('/api/cv/clear-history', {method:'POST'})
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(() => {
+      resetCycleHistoryView();
+      showToast('Completed cycles cleared', 'ok');
+    })
+    .catch(() => showToast('Clear history failed', 'err'));
+}
+
+/* ═══════════════════════════════════════════
+   SUCCESS RATE CHART
+═══════════════════════════════════════════ */
+const successChart = new Chart(document.getElementById('successChart').getContext('2d'), {
+  type: 'line',
+  data: { labels: [], datasets:[{
+    data: [], backgroundColor:'#00ff8811', borderColor:'#00ff88',
+    borderWidth:1.5, tension:0.4, fill:true, pointRadius:2, pointHoverRadius:4,
+  }]},
+  options: { animation:false, plugins:{legend:{display:false}},
+    scales:{
+      x:{ display:false },
+      y:{ min:0, max:100,
+          ticks:{color:'#334455',font:{size:9},stepSize:25},
+          grid:{color:'#111122'} }
+    }
+  }
+});
+
+/* ═══════════════════════════════════════════
+   PHASE BREAKDOWN (stacked bar)
+═══════════════════════════════════════════ */
+const PHASE_COLORS = {
+  pre_align: '#4488ff',
+  descent:   '#00ff88',
+  grip:      '#ffcc00',
+  lift:      '#ff6b35',
+  pre_place: '#bb66ff',
+  place:     '#00ccff',
+  retreat:   '#ff3355',
+};
+const PHASE_ORDER = ['pre_align','descent','grip','lift','pre_place','place','retreat'];
+
+const phaseChart = new Chart(document.getElementById('phaseChart').getContext('2d'), {
+  type: 'bar',
+  data: { labels: [], datasets: PHASE_ORDER.map(name => ({
+    label: name,
+    data: [],
+    backgroundColor: PHASE_COLORS[name],
+    borderWidth: 0,
+    stack: 's',
+  })) },
+  options: {
+    animation: false, responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { mode: 'index' } },
+    scales: {
+      x: { stacked: true, ticks:{color:'#334455',font:{size:10}}, grid:{color:'#111122'} },
+      y: { stacked: true, ticks:{color:'#334455',font:{size:10}}, grid:{color:'#111122'},
+           title: { display:true, text:'seconds', color:'#445566', font:{size:9} } }
+    }
+  }
+});
+
+// Phase legend
+{
+  const leg = document.getElementById('phase-legend');
+  leg.innerHTML = PHASE_ORDER.map(p =>
+    `<span style='display:inline-flex;align-items:center;gap:4px'>
+       <span style='display:inline-block;width:10px;height:10px;background:${PHASE_COLORS[p]};border-radius:2px'></span>
+       ${p}
+     </span>`).join('');
+}
+
+function updatePhaseChart(log) {
+  if (!log || !log.length) return;
+  const tail = log.slice(-12);
+  phaseChart.data.labels = tail.map(e => '#' + e.cycle);
+  PHASE_ORDER.forEach((name, idx) => {
+    phaseChart.data.datasets[idx].data = tail.map(e => (e.phases && e.phases[name]) || 0);
+  });
+  phaseChart.update();
+}
+
+/* ═══════════════════════════════════════════
+   TWIN SYNC (Δ CV-USD) CHART
+═══════════════════════════════════════════ */
+const twinSyncChart = new Chart(document.getElementById('twinSyncChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      {
+        // Δ_post: residual after EMA bias correction. The "headline" series.
+        label: 'Δ_post (corrected)',
+        data: [],
+        borderColor: '#22dd66',
+        backgroundColor: '#22dd6622',
+        borderWidth: 1.6,
+        tension: 0.25,
+        fill: true,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        pointBackgroundColor: ctx => {
+          const v = ctx.parsed && ctx.parsed.y;
+          if (v == null) return '#888';
+          if (v < 5)  return '#22dd66';
+          if (v < 10) return '#ddaa22';
+          return '#dd4444';
+        },
+      },
+      {
+        // Δ_pre: raw projection error (CV without bias correction). Honest
+        // measure of perception quality - not self-referential.
+        label: 'Δ_pre (raw)',
+        data: [],
+        borderColor: '#ff8844',
+        backgroundColor: '#ff884411',
+        borderWidth: 1.2,
+        borderDash: [4, 3],
+        tension: 0.25,
+        fill: false,
+        pointRadius: 1.5,
+        pointHoverRadius: 3,
+      },
+    ],
+  },
+  options: {
+    animation: false, responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+    scales: {
+      x: { ticks: { color: '#334455', font: { size: 9 } }, grid: { color: '#111122' } },
+      y: { beginAtZero: true,
+           ticks: { color: '#334455', font: { size: 9 } },
+           grid: { color: '#111122' },
+           title: { display: true, text: 'mm', color: '#445566', font: { size: 9 } } },
+    },
+  },
+});
+
+function updateTwinSyncChart(history, preHistory) {
+  if (!history || !history.length) return;
+  twinSyncChart.data.labels = history.map((_, i) => '#' + (i + 1));
+  twinSyncChart.data.datasets[0].data = history;
+  // Δ_pre is optional (older runs / partial state may omit it).
+  twinSyncChart.data.datasets[1].data = preHistory || [];
+  twinSyncChart.update();
+
+  const mean = history.reduce((a, b) => a + b, 0) / history.length;
+  const last = history[history.length - 1];
+  const meanEl = document.getElementById('twin-mean');
+  const lastEl = document.getElementById('twin-last');
+  if (meanEl) meanEl.textContent = mean.toFixed(1);
+  if (lastEl) lastEl.textContent = last.toFixed(1);
+  if (meanEl) {
+    meanEl.style.color = mean < 5 ? '#22dd66' : (mean < 10 ? '#ddaa22' : '#dd4444');
+  }
+  if (lastEl) {
+    lastEl.style.color = last < 5 ? '#22dd66' : (last < 10 ? '#ddaa22' : '#dd4444');
+  }
+
+  const preEl = document.getElementById('twin-pre-mean');
+  if (preEl) {
+    if (preHistory && preHistory.length) {
+      const preMean = preHistory.reduce((a, b) => a + b, 0) / preHistory.length;
+      preEl.textContent = preMean.toFixed(1);
+    } else {
+      preEl.textContent = '-';
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PERFORMANCE STATS
+═══════════════════════════════════════════ */
+function updatePerfStats(d) {
+  const set = (id, val) => document.getElementById(id).textContent = val;
+  set('ps-total', d.sorted_total ?? 0);
+  set('ps-min',   d.min_cycle_time != null ? d.min_cycle_time + 's' : '-');
+  set('ps-avg',   d.avg_cycle_time != null ? d.avg_cycle_time + 's' : '-');
+  set('ps-max',   d.max_cycle_time != null ? d.max_cycle_time + 's' : '-');
+  set('ps-thr',   d.throughput_cpm != null ? d.throughput_cpm : '-');
+}
+
+/* ═══════════════════════════════════════════
+   SYSTEM HEALTH BADGES
+═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   HISTORY TAB
+═══════════════════════════════════════════ */
+let _lastHistLen = 0;
+let lastCycleLog = [];
+
+function updateHistoryTab(cycleLog) {
+  if (!cycleLog || !cycleLog.length) return;
+  lastCycleLog = cycleLog;
+
+  let red = 0, blue = 0, green = 0, fail = 0;
+  cycleLog.forEach(e => {
+    if (e.color === 'red')        red++;
+    else if (e.color === 'blue')  blue++;
+    else if (e.color === 'green') green++;
+    else                          fail++;
+  });
+  document.getElementById('hs-total').textContent = cycleLog.length;
+  document.getElementById('hs-red').textContent   = red;
+  document.getElementById('hs-blue').textContent  = blue;
+  document.getElementById('hs-green').textContent = green;
+  document.getElementById('hs-fail').textContent  = fail;
+
+  const tbody = document.getElementById('hist-tbody');
+  const isNew = cycleLog.length !== _lastHistLen;
+  _lastHistLen = cycleLog.length;
+
+  const COLOR_HTML = {
+    red:   '<span class="badge-red">■ RED</span>',
+    blue:  '<span class="badge-blue">■ BLUE</span>',
+    green: '<span class="badge-green">■ GREEN</span>',
+  };
+  const RES_CLASS = r =>
+    r.startsWith('✓') ? 'res-ok' : r.startsWith('⊘') ? 'res-skip' : 'res-fail';
+
+  tbody.innerHTML = [...cycleLog].reverse().map((e, i) => {
+    const result = escapeHtml(e.result ?? '');
+    return `<tr class='${i === 0 && isNew ? "new-row" : ""}'>
+      <td style='color:var(--dim);padding:3px 6px'>${escapeHtml(e.cycle)}</td>
+      <td style='color:var(--dim);padding:3px 6px'>${escapeHtml(e.ts ?? '-')}</td>
+      <td style='padding:3px 6px'>${COLOR_HTML[e.color] ?? '<span class="badge-none">-</span>'}</td>
+      <td class='${RES_CLASS(e.result ?? '')}' style='padding:3px 6px'>${result}</td>
+    </tr>`;
+  }).join('');
+
+  // Success rate chart
+  let s = 0, f = 0;
+  const srData = cycleLog.map(e => {
+    if (e.color === 'red' || e.color === 'blue') s++; else f++;
+    return s + f > 0 ? Math.round(s / (s + f) * 100) : 0;
+  });
+  successChart.data.labels   = cycleLog.map(e => e.cycle);
+  successChart.data.datasets[0].data = srData;
+  successChart.update();
+}
+
+/* ═══════════════════════════════════════════
+   LOOPS
+═══════════════════════════════════════════ */
+pollTelemetry();
+pollCV();
+setInterval(pollTelemetry, 250);
+setInterval(pollCV, 250);
+drawWorkspace(null, []);           // initial draw
+
+// Page Visibility: skip polls while the tab is in the background (saves CPU
+// and network); on focus return, refresh state immediately without waiting
+// for the next interval tick.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    pollTelemetry();
+    pollCV();
+  }
+});
+</script>
+<div id='toast-container'></div>
+</body>
+</html>

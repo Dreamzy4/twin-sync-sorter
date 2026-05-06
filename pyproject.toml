@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twin-sync-sorter"
+version = "0.9.0"
+description = "CV-driven Franka Panda digital twin in NVIDIA Omniverse Isaac Sim."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "Andrii Filipov" }]
+keywords = ["digital-twin", "isaac-sim", "omniverse", "openusd", "computer-vision", "robotics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Runtime dependencies for the dashboard server and standalone CV tooling.
+# Isaac Sim / Omniverse modules (omni.isaac.*, omni.kit.*, pxr) are provided
+# by the Isaac Sim Python environment and are NOT pip-installable.
+dependencies = [
+    "flask>=3.0,<4.0",
+    # numpy<2.0 is intentional: opencv-python 4.x is built against the
+    # 1.x ABI and segfaults on np.ndarray buffers from numpy 2.x at
+    # cv2.imdecode / imencode. Drop the cap once opencv-python 5.x ships
+    # with a 2.x ABI build.
+    "numpy>=1.24,<2.0",
+    "opencv-python>=4.8",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.1.0",
+]
+
+[tool.setuptools]
+py-modules = [
+    "async_logger",
+    "cv_detector",
+    "dashboard_server",
+    "joint_control",
+    "robot_motion",
+    "scene_config",
+    "telemetry",
+]
+
+[tool.ruff]
+line-length = 140
+target-version = "py310"
+
+[tool.ruff.lint]
+# E (pycodestyle errors), F (pyflakes), I (import order), B (bugbear),
+# UP (pyupgrade). Together they catch the bulk of correctness, ordering and
+# modernization issues without requiring the team to adopt a full style guide.
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# pytest needs sys.path adjusted before it can import the project under test.
+"tests/conftest.py" = ["E402"]

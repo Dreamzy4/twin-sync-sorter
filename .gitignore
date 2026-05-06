@@ -1,0 +1,50 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# ── Linters / formatters cache ──
+.ruff_cache/
+.mypy_cache/
+
+# ── Virtual environments ──
+.env
+.venv/
+venv/
+env/
+
+# ── Blender editing artifacts (large source files, not runtime) ──
+*.blend
+*.blend1
+
+# ── FBX exports (Isaac uses USD; FBX kept locally for editing only) ──
+*.fbx
+
+# ── Runtime logs and debug screenshots ──
+logs/*.log
+logs/telemetry_log.json
+dbg_*.png
+dbg_*_mask.png
+
+# ── Large media (host on Loom/YouTube unlisted, link from README) ──
+*.mp4
+*.mov
+*.webm
+*.mkv
+
+# ── Generated docs / reports ──
+*.docx
+*.bak
+
+# ── IDE / OS ──
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
