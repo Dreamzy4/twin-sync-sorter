@@ -1,5 +1,6 @@
 # twin-sync-sorter
 
+[![CI](https://github.com/Dreamzy4/twin-sync-sorter/actions/workflows/ci.yml/badge.svg)](https://github.com/Dreamzy4/twin-sync-sorter/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue)](https://www.python.org)
 [![Omniverse](https://img.shields.io/badge/NVIDIA-Omniverse-76b900)](https://www.nvidia.com/omniverse)
@@ -99,14 +100,14 @@ flowchart LR
         Robot[Franka Panda<br/>articulation]
     end
 
-    Cam -->|RGB + depth frame| CV[CVDetector<br/>HSV mask -> contour -> PnP / PCA]
+    Cam -->|RGB + depth frame| CV["CVDetector<br/>HSV → contour → PnP/PCA"]
     Stage -->|prim transforms<br/>ground truth| CV
     CV -->|world XYZ + yaw| Motion[JointController<br/>RmpFlow policy]
     Motion -->|joint commands| Robot
 
     CV -. base64 frames + detections .-> Poster[CVPoster thread]
     Robot -. joints / motors / loads .-> Tele[Telemetry thread]
-    Poster -->|HTTP POST| Flask[(Flask dashboard<br/>localhost:5000)]
+    Poster -->|HTTP POST| Flask["Flask dashboard<br/>localhost:5000"]
     Tele -->|HTTP POST| Flask
     Flask -->|HTML, MJPEG, JSON| Browser
 ```
