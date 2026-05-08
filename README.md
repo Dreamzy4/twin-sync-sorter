@@ -3,7 +3,7 @@
 [![CI](https://github.com/Dreamzy4/twin-sync-sorter/actions/workflows/ci.yml/badge.svg)](https://github.com/Dreamzy4/twin-sync-sorter/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue)](https://www.python.org)
-[![Omniverse](https://img.shields.io/badge/NVIDIA-Omniverse-76b900)](https://www.nvidia.com/omniverse)
+[![Omniverse](https://img.shields.io/static/v1?label=NVIDIA&message=Omniverse&color=76b900&logo=nvidia&logoColor=white)](https://www.nvidia.com/omniverse)
 
 Closed-loop computer-vision pickup demo on a **Franka Panda digital twin** in **NVIDIA Omniverse Isaac Sim**. The robot detects coloured cubes through a simulated RealSense D455, picks each one up with RmpFlow motion planning, and sorts it into a colour-matched container - while a Flask dashboard streams live RGB / depth, joint telemetry, and a per-cycle **twin-sync metric** comparing CV detections against USD ground truth.
 
