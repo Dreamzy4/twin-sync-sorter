@@ -20,13 +20,6 @@ htmlcov/
 venv/
 env/
 
-# ── Blender editing artifacts (large source files, not runtime) ──
-*.blend
-*.blend1
-
-# ── FBX exports (Isaac uses USD; FBX kept locally for editing only) ──
-*.fbx
-
 # ── Runtime logs and debug screenshots ──
 logs/*.log
 logs/telemetry_log.json
